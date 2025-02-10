@@ -1,55 +1,282 @@
 <template>
-<trading-vue :data="chart" :width="this.width" :height="this.height"
-        :color-back="colors.colorBack"
-        :color-grid="colors.colorGrid"
-        :color-text="colors.colorText">
-</trading-vue>
+    <span>
+        <trading-vue :data="chart" :width="this.width" :height="this.height"
+                :titleTxt="symbol"
+                :night="night"
+                :toolbar="true"
+                :index-based="index_based"
+                :log_scale="log_scale"
+                :selected_timeframe="selected_timeframe"
+                :color-back="colors.colorBack"
+                :color-grid="colors.colorGrid"
+                :color-text="colors.colorText"
+                ref="tradingVue">
+        </trading-vue>
+        <tf-selector :charts="charts" v-on:selected="on_selected"></tf-selector>
+        <span class="night-mode">
+            <input type="checkbox" v-model="night">
+            <label>Night Mode</label>
+        </span>
+        <span class="log-scale">
+            <input type="checkbox" v-model="log_scale">
+            <label>Log Scale</label>
+        </span>
+        <span class="gc-mode">
+            <input type="checkbox" v-model="index_based">
+            <label>Index Based</label>
+        </span>
+    </span>
 </template>
-
+    
 <script>
 import TradingVue from './TradingVue.vue'
-import Data from '../data/data.json'
-import DataCube from '../src/helpers/datacube.js'
+import Const from './stuff/constants.js'
+import Utils from './stuff/utils.js'
+import TfSelector from './components/Timeframes/TFSelector.vue'
+import Stream from './components/DataHelper/stream.js'
+import DataCube from './helpers/datacube.js'
+
+// Gettin' data through webpeck proxy
+const PORT = location.port
+const URL = `http://localhost:${PORT}/api/v1/klines?symbol=`
+const WSS = `ws://localhost:${PORT}/ws/btcusdt@aggTrade`
+
+const binancesTimeframesMap = new Map();
+binancesTimeframesMap.set('5m', '5m');
+binancesTimeframesMap.set('H', '1h');
+binancesTimeframesMap.set('D', '1d');
+binancesTimeframesMap.set('W', '1w');
+binancesTimeframesMap.set('M', '1M');
+const binancesTimeframes = [
+    '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'
+]
+const timeFrames = {'5m': [], 'H': [], 'D': [], 'W': [], 'M': []}
+
 
 export default {
-    name: 'app',
+    name: 'Timeframes',
+    description: 'Should display correct dates for every timeframe',
     components: {
-        TradingVue
+        TradingVue, TfSelector
     },
     methods: {
-        onResize() {
+        onResize(event) {
             this.width = window.innerWidth
-            this.height = window.innerHeight
+            this.height = window.innerHeight - 50
+        },
+        on_selected(tf) {
+            this.selected_timeframe = binancesTimeframesMap.get(tf.name)
+            this.reloadData(this.selected_timeframe)
+        },
+        // New data handler. Should return Promise, or
+        // use callback: load_chunk(range, tf, callback)
+        async load_chunk(range, interval) {
+            let [t1, t2] = range
+            let x = 'BTCUSDT'
+            let q = `${x}&interval=${interval}&startTime=${t1}&endTime=${t2}`
+            let r = await fetch(URL + q).then(r => r.json())
+            return this.format(this.parse_binance(r))
+        },
+        // Parse a specific exchange format
+        parse_binance(data) {
+            if (!Array.isArray(data)) return []
+            return data.map(x => {
+                for (var i = 0; i < x.length; i++) {
+                    x[i] = parseFloat(x[i])
+                }
+                return x.slice(0,6)
+            })
+        },
+        format(data) {
+            // Each query sets data to a corresponding overlay
+            return {
+                'chart.data': data
+                // other onchart/offchart overlays can be added here,
+                // but we are using Script Engine to calculate some:
+                // see EMAx6 & BuySellBalance
+            }
+        },
+        on_trades(trade) {
+            if (!this.chart) return
+            this.chart.update({
+                t: trade.T,     // Exchange time (optional)
+                price: parseFloat(trade.p),   // Trade price
+                volume: parseFloat(trade.q),  // Trade amount
+                'datasets.binance-btcusdt': [ // Update dataset
+                    trade.T,
+                    trade.m ? 0 : 1,          // Sell or Buy
+                    parseFloat(trade.q),
+                    parseFloat(trade.p)
+                ],
+                // ... other onchart/offchart updates
+            })
+        },
+        reloadData(interval) {
+            if (!this.chart) return
+            let now = Utils.now()
+            this.load_chunk([now - Const.HOUR4, now], interval).then(data => {
+            this.chart = new DataCube({
+                ohlcv: data['chart.data'],
+                // onchart: [{
+                //     type: 'EMAx6',
+                //     name: 'Multiple EMA',
+                //     data: []
+                // }],
+                // offchart: [{
+                //     type: 'BuySellBalance',
+                //     name: 'Buy/Sell Balance, $lookback',
+                //     data: [],
+                //     settings: {}
+                // }],
+                datasets: [{
+                    type: 'Trades',
+                    id: 'binance-btcusdt',
+                    data: []
+                }]
+            }, { aggregation: 100 })
+            // Register onrange callback & And a stream of trades
+            this.chart.onrange(range => this.load_chunk(range, interval))
+            this.$refs.tradingVue.resetChart()
+            this.stream = new Stream(WSS)
+            this.stream.ontrades = this.on_trades
+            })
         }
     },
     mounted() {
         window.addEventListener('resize', this.onResize)
+        this.onResize()
         window.dc = this.chart
+        window.tv = this.$refs.tradingVue
+
+        // Load the last data chunk & init DataCube:
+        this.reloadData(this.selected_timeframe)
+    },
+    computed: {
+        colors() {
+            return this.night ? {} : {
+                colorBack: '#fff',
+                colorGrid: '#eee',
+                colorText: '#333'
+            }
+        },
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.onResize)
     },
     data() {
         return {
-            chart: new DataCube(Data),
+            charts: timeFrames,
+            chart: {},
+            symbol: 'BTCUSDT',
             width: window.innerWidth,
             height: window.innerHeight,
-            colors: {
-                colorBack: '#fff',
-                colorGrid: '#eee',
-                colorText: '#333',
-            }
+            log_scale: localStorage.getItem('tradingVue:log_scale') === 'true',
+            index_based: localStorage.getItem('tradingVue:index_based') === 'true',
+            night: localStorage.getItem('tradingVue:nm') === 'true',
+            selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
         };
+    },
+    watch: {
+        log_scale(value) {
+            if (this.chart.data.chart) {
+                this.$set(this.chart.data.chart, 'grid', {
+                    logScale: value
+                })
+                localStorage.setItem('tradingVue:log_scale', value)
+            }
+        },
+        night(v) {
+            localStorage.setItem('tradingVue:nm', v)
+        },
+        index_based(v) {
+            localStorage.setItem('tradingVue:index_based', v)
+        },
+        selected_timeframe(v) {
+            localStorage.setItem('tradingVue:selected_timeframe', v)
+        }
     }
-};
+}
 </script>
 
 <style>
-html,
-body {
-    background-color: #000;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
+.tf-selector {
+    top: 50px;
+    left: 75px;
+    font: 12px -apple-system,BlinkMacSystemFont,
+        Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
+        Fira Sans,Droid Sans,Helvetica Neue,
+        sans-serif;
+}
+.night-mode {
+    position: absolute;
+    top: 100px;
+    right: 700px;
+    color: #888;
+    font: 11px -apple-system, BlinkMacSystemFont,
+        Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+        Fira Sans, Droid Sans, Helvetica Neue,
+        sans-serif
+}
+.log-scale {
+    position: absolute;
+    top: 100px;
+    right: 600px;
+    color: #888;
+    font: 11px -apple-system, BlinkMacSystemFont,
+        Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+        Fira Sans, Droid Sans, Helvetica Neue,
+        sans-serif
+}
+.gc-mode {
+    position: absolute;
+    top: 100px;
+    right: 500px;
+    color: #888;
+    font: 11px -apple-system, BlinkMacSystemFont,
+        Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+        Fira Sans, Droid Sans, Helvetica Neue,
+        sans-serif
+}
+@media only screen and (max-device-width: 480px) {
+    .tf-selector {
+        top: 50px;
+        left: 70px;
+        max-width: 300px;
+        font: 12px -apple-system,BlinkMacSystemFont,
+            Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
+            Fira Sans,Droid Sans,Helvetica Neue,
+            sans-serif;
+    }
+    .night-mode {
+        position: absolute;
+        top: 100px;
+        right: 240px;
+        color: #888;
+        font: 11px -apple-system, BlinkMacSystemFont,
+            Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+            Fira Sans, Droid Sans, Helvetica Neue,
+            sans-serif
+    }
+    .log-scale {
+        position: absolute;
+        top: 100px;
+        right: 160px;
+        color: #888;
+        font: 11px -apple-system, BlinkMacSystemFont,
+            Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+            Fira Sans, Droid Sans, Helvetica Neue,
+            sans-serif
+    }
+    .gc-mode {
+        position: absolute;
+        top: 100px;
+        right: 70px;
+        color: #888;
+        font: 11px -apple-system, BlinkMacSystemFont,
+            Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+            Fira Sans, Droid Sans, Helvetica Neue,
+            sans-serif
+    }
 }
 </style>
+    

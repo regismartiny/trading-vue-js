@@ -44,6 +44,21 @@ module.exports = (env, options) => ({
     ],
     devServer: {
         host: '0.0.0.0',
+        proxy: {
+            '/api/v1/**': {
+                target: 'https://api.binance.com',
+                changeOrigin: true
+            },
+            '/ws/**': {
+                target: 'wss://stream.binance.com:9443',
+                changeOrigin: true,
+                ws: true
+            },
+            '/api/udf/**': {
+                target: 'https://www.bitmex.com',
+                changeOrigin: true
+            },
+        },
         onListening: function(server) {
             const port = server.listeningApp.address().port
             global.port = port

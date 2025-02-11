@@ -17,6 +17,10 @@ export default function Stream(url) {
         }
     }
 
+    ws.onclose = function() {
+        console.log('Websocket is closed')
+    }
+
     return {
         set ontrades(val) { cb = val },
         off() { ws.close(1000) }

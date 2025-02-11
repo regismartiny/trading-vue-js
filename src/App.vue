@@ -4,6 +4,7 @@
                 :titleTxt="symbol"
                 :night="night"
                 :toolbar="true"
+                :timezone="-3"
                 :index-based="index_based"
                 :log_scale="log_scale"
                 :selected_timeframe="selected_timeframe"
@@ -12,7 +13,7 @@
                 :color-text="colors.colorText"
                 ref="tradingVue">
         </trading-vue>
-        <tf-selector :charts="charts" v-on:selected="on_selected"></tf-selector>
+        <tf-selector :charts="charts" :selectedTimeframeIndex="selected_timeframe_index" v-on:selected="on_selected"></tf-selector>
         <span class="night-mode">
             <input type="checkbox" v-model="night">
             <label>Night Mode</label>
@@ -41,17 +42,22 @@ const PORT = location.port
 const URL = `http://localhost:${PORT}/api/v1/klines?symbol=`
 const WSS = `ws://localhost:${PORT}/ws/btcusdt@aggTrade`
 
-const binancesTimeframesMap = new Map();
-binancesTimeframesMap.set('5m', '5m');
-binancesTimeframesMap.set('H', '1h');
-binancesTimeframesMap.set('D', '1d');
-binancesTimeframesMap.set('W', '1w');
-binancesTimeframesMap.set('M', '1M');
-const binancesTimeframes = [
-    '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'
-]
-const timeFrames = {'5m': [], 'H': [], 'D': [], 'W': [], 'M': []}
+const CHUNK_SIZE = 200
 
+// const binancesTimeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+const binanceTimeframesMap = new Map();
+binanceTimeframesMap.set('1m', '1m');
+binanceTimeframesMap.set('5m', '5m');
+binanceTimeframesMap.set('15m', '15m');
+binanceTimeframesMap.set('30m', '30m');
+binanceTimeframesMap.set('1H', '1h');
+binanceTimeframesMap.set('4H', '4h');
+binanceTimeframesMap.set('1D', '1d');
+binanceTimeframesMap.set('1W', '1w');
+binanceTimeframesMap.set('1M', '1M');
+const timeFrames = Object.fromEntries(
+  [...binanceTimeframesMap.keys()].map(value => [value, []])
+);
 
 export default {
     name: 'Timeframes',
@@ -65,7 +71,7 @@ export default {
             this.height = window.innerHeight - 50
         },
         on_selected(tf) {
-            this.selected_timeframe = binancesTimeframesMap.get(tf.name)
+            this.selected_timeframe = tf.name
             this.reloadData(this.selected_timeframe)
         },
         // New data handler. Should return Promise, or
@@ -113,8 +119,12 @@ export default {
         },
         reloadData(interval) {
             if (!this.chart) return
+            if (this.stream) this.stream.off()
             let now = Utils.now()
-            this.load_chunk([now - Const.HOUR4, now], interval).then(data => {
+            const sub = Const.map_unit[interval] * CHUNK_SIZE
+            const startTime = now - sub
+            const binanceTf = binanceTimeframesMap.get(interval)
+            this.load_chunk([startTime, now], binanceTf).then(data => {
             this.chart = new DataCube({
                 ohlcv: data['chart.data'],
                 // onchart: [{
@@ -174,6 +184,7 @@ export default {
             index_based: localStorage.getItem('tradingVue:index_based') === 'true',
             night: localStorage.getItem('tradingVue:nm') === 'true',
             selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
+            selected_timeframe_index: Object.keys(timeFrames).indexOf(localStorage.getItem('tradingVue:selected_timeframe'))
         };
     },
     watch: {
@@ -202,14 +213,15 @@ export default {
 .tf-selector {
     top: 50px;
     left: 75px;
-    font: 12px -apple-system,BlinkMacSystemFont,
+    width: 270px;
+    font: 16px -apple-system,BlinkMacSystemFont,
         Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
         Fira Sans,Droid Sans,Helvetica Neue,
         sans-serif;
 }
 .night-mode {
     position: absolute;
-    top: 100px;
+    top: 90px;
     right: 700px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
@@ -219,7 +231,7 @@ export default {
 }
 .log-scale {
     position: absolute;
-    top: 100px;
+    top: 90px;
     right: 600px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
@@ -229,7 +241,7 @@ export default {
 }
 .gc-mode {
     position: absolute;
-    top: 100px;
+    top: 90px;
     right: 500px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,

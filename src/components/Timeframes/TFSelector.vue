@@ -12,7 +12,7 @@
 <script>
 export default {
     name: 'TfSelector',
-    props: ['charts'],
+    props: ['charts', 'selectedTimeframeIndex'],
     mounted() {
         this.$emit('selected', {
             name: this.timeframes[this.selected],
@@ -35,7 +35,7 @@ export default {
     },
     data() {
         return {
-            selected: 0
+            selected: this.$props.selectedTimeframeIndex
         }
     }
 }

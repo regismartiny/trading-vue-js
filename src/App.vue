@@ -8,6 +8,8 @@
                 :index-based="index_based"
                 :log_scale="log_scale"
                 :selected_timeframe="selected_timeframe"
+                :selected_symbol="selected_symbol"
+                :colors="colors"
                 :color-back="colors.colorBack"
                 :color-grid="colors.colorGrid"
                 :color-text="colors.colorText"
@@ -37,7 +39,7 @@ import TfSelector from './components/Timeframes/TFSelector.vue'
 import Stream from './components/DataHelper/stream.js'
 import DataCube from './helpers/datacube.js'
 
-// Gettin' data through webpeck proxy
+// Gettin' data through webpack proxy
 const PORT = location.port
 const URL = `http://localhost:${PORT}/api/v1/klines?symbol=`
 const WSS = `ws://localhost:${PORT}/ws/btcusdt@aggTrade`
@@ -60,26 +62,25 @@ const timeFrames = Object.fromEntries(
 );
 
 export default {
-    name: 'Timeframes',
-    description: 'Should display correct dates for every timeframe',
+    name: 'App',
+    description: 'Main App',
     components: {
         TradingVue, TfSelector
     },
     methods: {
         onResize(event) {
             this.width = window.innerWidth
-            this.height = window.innerHeight - 50
+            this.height = window.innerHeight
         },
         on_selected(tf) {
             this.selected_timeframe = tf.name
-            this.reloadData(this.selected_timeframe)
+            this.reloadData(this.selected_symbol, this.selected_timeframe)
         },
         // New data handler. Should return Promise, or
         // use callback: load_chunk(range, tf, callback)
-        async load_chunk(range, interval) {
+        async load_chunk(symbol, range, interval) {
             let [t1, t2] = range
-            let x = 'BTCUSDT'
-            let q = `${x}&interval=${interval}&startTime=${t1}&endTime=${t2}`
+            let q = `${symbol}&interval=${interval}&startTime=${t1}&endTime=${t2}`
             let r = await fetch(URL + q).then(r => r.json())
             return this.format(this.parse_binance(r))
         },
@@ -117,14 +118,14 @@ export default {
                 // ... other onchart/offchart updates
             })
         },
-        reloadData(interval) {
+        reloadData(symbol, interval) {
             if (!this.chart) return
             if (this.stream) this.stream.off()
             let now = Utils.now()
             const sub = Const.map_unit[interval] * CHUNK_SIZE
             const startTime = now - sub
             const binanceTf = binanceTimeframesMap.get(interval)
-            this.load_chunk([startTime, now], binanceTf).then(data => {
+            this.load_chunk(symbol, [startTime, now], binanceTf).then(data => {
             this.chart = new DataCube({
                 ohlcv: data['chart.data'],
                 // onchart: [{
@@ -145,7 +146,7 @@ export default {
                 }]
             }, { aggregation: 100 })
             // Register onrange callback & And a stream of trades
-            this.chart.onrange(range => this.load_chunk(range, interval))
+            this.chart.onrange(range => this.load_chunk(symbol, range, binanceTf))
             this.$refs.tradingVue.resetChart()
             this.stream = new Stream(WSS)
             this.stream.ontrades = this.on_trades
@@ -159,7 +160,7 @@ export default {
         window.tv = this.$refs.tradingVue
 
         // Load the last data chunk & init DataCube:
-        this.reloadData(this.selected_timeframe)
+        this.reloadData(this.selected_symbol, this.selected_timeframe)
     },
     computed: {
         colors() {
@@ -177,14 +178,15 @@ export default {
         return {
             charts: timeFrames,
             chart: {},
-            symbol: 'BTCUSDT',
+            symbol: getSelectedSymbol(),
             width: window.innerWidth,
             height: window.innerHeight,
             log_scale: localStorage.getItem('tradingVue:log_scale') === 'true',
             index_based: localStorage.getItem('tradingVue:index_based') === 'true',
             night: localStorage.getItem('tradingVue:nm') === 'true',
+            selected_symbol: getSelectedSymbol(),
             selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
-            selected_timeframe_index: Object.keys(timeFrames).indexOf(localStorage.getItem('tradingVue:selected_timeframe'))
+            selected_timeframe_index: getSelectedTimeframeIndex()
         };
     },
     watch: {
@@ -204,15 +206,27 @@ export default {
         },
         selected_timeframe(v) {
             localStorage.setItem('tradingVue:selected_timeframe', v)
+        },
+        selected_symbol(v) {
+            localStorage.setItem('tradingVue:selected_symbol', v)
         }
     }
+}
+
+function getSelectedSymbol() {
+    return localStorage.getItem('tradingVue:selected_symbol') || 'BTCUSDT'
+}
+
+function getSelectedTimeframeIndex() {
+    const selectedTimeframe = localStorage.getItem('tradingVue:selected_timeframe') || '1D'
+    return Object.keys(timeFrames).indexOf(selectedTimeframe)
 }
 </script>
 
 <style>
 .tf-selector {
     top: 50px;
-    left: 75px;
+    left: 60px;
     width: 270px;
     font: 16px -apple-system,BlinkMacSystemFont,
         Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
@@ -222,7 +236,7 @@ export default {
 .night-mode {
     position: absolute;
     top: 90px;
-    right: 700px;
+    left: 60px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
@@ -232,7 +246,7 @@ export default {
 .log-scale {
     position: absolute;
     top: 90px;
-    right: 600px;
+    left: 160px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
@@ -242,7 +256,7 @@ export default {
 .gc-mode {
     position: absolute;
     top: 90px;
-    right: 500px;
+    left: 250px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,

@@ -42,7 +42,7 @@ import DataCube from './helpers/datacube.js'
 // Gettin' data through webpack proxy
 const PORT = location.port
 const URL = `http://localhost:${PORT}/api/v1/klines?symbol=`
-const WSS = `ws://localhost:${PORT}/ws/btcusdt@aggTrade`
+const WSS = `ws://localhost:${PORT}/ws/api/btcusdt@aggTrade`
 
 const CHUNK_SIZE = 200
 

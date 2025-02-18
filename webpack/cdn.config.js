@@ -2,7 +2,6 @@ const VueLoaderPlugin = require('vue-loader/lib/plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const TerserPlugin = require('terser-webpack-plugin')
 const WWPlugin = require('./ww_plugin.js')
-const webpack = require('webpack')
 const fs = require('fs')
 
 global.port = '8080'
@@ -18,24 +17,24 @@ module.exports = [{
     },
     module: {
         rules: [{
-                test: /\.vue$/,
+                test: /\.vue$/i,
                 exclude: /node_modules/,
                 loader: 'vue-loader'
             },
             {
-                test: /\.js$/,
+                test: /\.js$/i,
                 exclude: /node_modules/,
                 loader: 'babel-loader'
             },
             {
-                test: /\.css$/,
+                test: /\.css$/i,
                 use: [
                     'vue-style-loader',
                     'css-loader'
                 ]
             },
             {
-                test: /script_ww\.js$/,
+                test: /script_ww\.js$/i,
                 loader: 'worker-loader'
             }
         ]
@@ -75,8 +74,12 @@ module.exports = [{
     ],
     devServer: {
         onListening: function(server) {
-            const port = server.listeningApp.address().port
-            global.port = port
+            const address = server.listeningApp && server.listeningApp.address();
+            if (address) {
+                global.port = address.port;
+            } else {
+                console.error('Error: Unable to get the address of the server');
+            }
         }
     }
 }, {
@@ -88,19 +91,21 @@ module.exports = [{
     },
     module: {
         rules: [
-         {
-           test: /\.js/i,
-           use: 'raw-loader',
-         },
-       ]
+            {
+                test: /\.js/i,
+                use: 'raw-loader',
+            },
+        ]
     },
     optimization: {
         runtimeChunk: true,
         minimize: true,
-        minimizer: [new TerserPlugin({
-            include: /\.js$/,
-            sourceMap: false,
-        })]
+        minimizer: [
+            new TerserPlugin({
+                include: /\.js$/,
+                // Removed sourceMap: false as it is not valid
+            })
+        ]
     },
-    devtool: 'source-map'
+    devtool: 'source-map' // Webpack handles source map generation here
 }]

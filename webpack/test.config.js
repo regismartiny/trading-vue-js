@@ -42,35 +42,42 @@ module.exports = {
         })
     ],
     devServer: {
-        host: '0.0.0.0',
-        proxy: {
-            '/api/v1/**': {
-                target: 'https://api.binance.com',
-                changeOrigin: true
-            },
-            '/ws/**': {
-                target: 'wss://stream.binance.com:9443',
-                changeOrigin: true,
-                ws: true
-            },
-            '/api/udf/**': {
-                target: 'https://www.bitmex.com',
-                changeOrigin: true
-            },
-        },
-        onListening: function(server) {
-            const port = server.listeningApp.address().port
-            global.port = port
-        },
-        before(app){
-            app.get("/debug", function(req, res) {
-                try {
-                    let argv = JSON.parse(req.query.argv)
-                    console.log(...argv)
-                } catch(e) {}
-                res.send("[OK]")
-            })
-        }
-    },
+      host: '0.0.0.0',
+      proxy: [
+          {
+              context: ['/api/v1/**'],
+              target: 'https://api.binance.com',
+              changeOrigin: true,
+          },
+          {
+              context: ['/ws/api/**'],
+              target: 'wss://stream.binance.com:9443',
+              changeOrigin: true,
+              ws: true,
+          },
+          {
+              context: ['/api/udf/**'],
+              target: 'https://www.bitmex.com',
+              changeOrigin: true,
+          },
+      ],
+      onListening: function (server) {
+        // Use server.options.port to get the port instead of accessing 'listeningApp'
+        const port = server.options.port
+        global.port = port
+      },
+      setupMiddlewares: function (middlewares, devServer) {
+          // Replace the `before` middleware
+          devServer.app.get("/debug", function (req, res) {
+              try {
+                  let argv = JSON.parse(req.query.argv)
+                  console.log(...argv)
+              } catch (e) {}
+              res.send("[OK]")
+          })
+  
+          return middlewares
+      }
+    },  
     devtool: 'source-map'
 }

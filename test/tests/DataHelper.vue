@@ -30,7 +30,7 @@ import BSB from './Scripts/BuySellBalance.vue'
 // Gettin' data through webpeck proxy
 const PORT = location.port
 const URL = `http://localhost:${PORT}/api/v1/klines?symbol=`
-const WSS = `ws://localhost:${PORT}/ws/btcusdt@aggTrade`
+const WSS = `ws://localhost:${PORT}/ws/api/btcusdt@aggTrade`
 
 export default {
     name: 'DataHelper',

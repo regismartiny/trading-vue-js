@@ -42,7 +42,7 @@ import TfSelector from './components/Timeframes/TFSelector.vue'
 import Stream from './components/DataHelper/stream.js'
 import DataCube from './helpers/datacube.js'
 import CodeIcon from './components/LegendButtons/code3.json'
-import EMAx6 from './components/Scripts/EMAx6.vue'
+import EMA from './components/overlays/EMA/EMA.vue'
 import BB from './components/overlays/BB/BB.vue'
 
 // Gettin' data through webpack proxy
@@ -66,6 +66,43 @@ binanceTimeframesMap.set('1M', '1M');
 const timeFrames = Object.fromEntries(
   [...binanceTimeframesMap.keys()].map(value => [value, []])
 );
+
+const initialOnchartOverlays = [
+    {
+        type: 'EMA',
+        name: 'EMA, 20',
+        data: [],
+        settings: {
+            length: 20
+        }
+    },
+    {
+        type: 'EMA',
+        name: 'EMA, 100',
+        data: [],
+        settings: {
+            length: 100,
+            lineWidth: 1.5
+        }
+    },
+    {
+        type: 'EMA',
+        name: 'EMA, 200',
+        data: [],
+        settings: {
+            length: 200,
+            lineWidth: 2.0
+        }
+    },
+    {
+        type: 'BB',
+        name: 'BB, 21, 2',
+        data: [],
+        settings: {
+            display: false
+        }
+    }
+]
 
 export default {
     name: 'App',
@@ -134,18 +171,7 @@ export default {
             this.load_chunk(symbol, [startTime, now], binanceTf).then(data => {
             this.chart = new DataCube({
                 ohlcv: data['chart.data'],
-                onchart: [
-                    {
-                        type: 'EMAx6',
-                        name: 'Multiple EMA',
-                        data: []
-                    },
-                    {
-                        type: 'BB',
-                        name: 'Bollinger Bands',
-                        data: []
-                    }
-                ],
+                onchart: getOnchartOverlays(),
                 // offchart: [{
                 //     type: 'BuySellBalance',
                 //     name: 'Buy/Sell Balance, $lookback',
@@ -168,20 +194,24 @@ export default {
             })
         },
         on_button_click(event) {
-            if (event.button === 'display') {
-                let d = this.chart.data[event.type][event.dataIndex]
-                if (d) {
-                    if (!('display' in d.settings)) {
-                        this.$set(
-                            d.settings, 'display', true
-                        )
-                    }
-                    this.$set(
-                        d.settings, 'display', !d.settings.display
-                    )
-                }
-            }
             console.log(event)
+            if (event.type == 'onchart') {
+                if (event.button === 'display') {
+                    let d = this.chart.data[event.type][event.dataIndex]
+                    if (d) {
+                        if (!('display' in d.settings)) {
+                            this.$set(d.settings, 'display', true)
+                        }
+                        this.$set(d.settings, 'display', !d.settings.display)
+                    }
+                } else if(event.button === 'settings') {
+                    let d = this.chart.data[event.type][event.dataIndex]
+                    console.log('settings', d.settings)
+                } else if (event.button === 'remove') {
+                    this.chart.data[event.type].splice(event.dataIndex, 1)
+                }
+                localStorage.setItem('tradingVue:onchartOverlays', JSON.stringify(this.chart.data.onchart))
+            }
         }
     },
     mounted() {
@@ -219,7 +249,7 @@ export default {
             selected_symbol: getSelectedSymbol(),
             selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
             selected_timeframe_index: getSelectedTimeframeIndex(),
-            overlays: [EMAx6, BB],
+            overlays: [EMA, BB],
             buttons: [
                 'display', 'settings', 'remove',
                 // {
@@ -260,6 +290,11 @@ function getSelectedSymbol() {
 function getSelectedTimeframeIndex() {
     const selectedTimeframe = localStorage.getItem('tradingVue:selected_timeframe') || '1D'
     return Object.keys(timeFrames).indexOf(selectedTimeframe)
+}
+
+function getOnchartOverlays() {
+    const persistedOnchartOverlays = JSON.parse(localStorage.getItem('tradingVue:onchartOverlays'))
+    return persistedOnchartOverlays || initialOnchartOverlays
 }
 </script>
 

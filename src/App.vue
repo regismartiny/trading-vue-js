@@ -13,6 +13,9 @@
                 :color-back="colors.colorBack"
                 :color-grid="colors.colorGrid"
                 :color-text="colors.colorText"
+                :overlays="overlays"
+                :legend-buttons="buttons"
+                v-on:legend-button-click="on_button_click"
                 ref="tradingVue">
         </trading-vue>
         <tf-selector :charts="charts" :selectedTimeframeIndex="selected_timeframe_index" v-on:selected="on_selected"></tf-selector>
@@ -38,6 +41,9 @@ import Utils from './stuff/utils.js'
 import TfSelector from './components/Timeframes/TFSelector.vue'
 import Stream from './components/DataHelper/stream.js'
 import DataCube from './helpers/datacube.js'
+import CodeIcon from './components/LegendButtons/code3.json'
+import EMAx6 from './components/Scripts/EMAx6.vue'
+import BollingerBands from './components/Scripts/BollingerBands.vue'
 
 // Gettin' data through webpack proxy
 const PORT = location.port
@@ -128,11 +134,18 @@ export default {
             this.load_chunk(symbol, [startTime, now], binanceTf).then(data => {
             this.chart = new DataCube({
                 ohlcv: data['chart.data'],
-                // onchart: [{
-                //     type: 'EMAx6',
-                //     name: 'Multiple EMA',
-                //     data: []
-                // }],
+                onchart: [
+                    {
+                        type: 'EMAx6',
+                        name: 'Multiple EMA',
+                        data: []
+                    },
+                    // {
+                    //     type: 'BollingerBands',
+                    //     name: 'Bollinger Bands',
+                    //     data: []
+                    // }
+                ],
                 // offchart: [{
                 //     type: 'BuySellBalance',
                 //     name: 'Buy/Sell Balance, $lookback',
@@ -150,7 +163,25 @@ export default {
             this.$refs.tradingVue.resetChart()
             this.stream = new Stream(WSS)
             this.stream.ontrades = this.on_trades
+            window.dc = this.chart      // Debug
+            window.tv = this.$refs.tvjs // Debug
             })
+        },
+        on_button_click(event) {
+            if (event.button === 'display') {
+                let d = this.chart.data[event.type][event.dataIndex]
+                if (d) {
+                    if (!('display' in d.settings)) {
+                        this.$set(
+                            d.settings, 'display', true
+                        )
+                    }
+                    this.$set(
+                        d.settings, 'display', !d.settings.display
+                    )
+                }
+            }
+            console.log(event)
         }
     },
     mounted() {
@@ -173,6 +204,7 @@ export default {
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.onResize)
+        if (this.stream) this.stream.off()
     },
     data() {
         return {
@@ -186,7 +218,15 @@ export default {
             night: localStorage.getItem('tradingVue:nm') === 'true',
             selected_symbol: getSelectedSymbol(),
             selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
-            selected_timeframe_index: getSelectedTimeframeIndex()
+            selected_timeframe_index: getSelectedTimeframeIndex(),
+            overlays: [EMAx6, BollingerBands],
+            buttons: [
+                'display', 'settings', 'remove',
+                // {
+                //     name: 'code',
+                //     icon: CodeIcon
+                // }
+            ]
         };
     },
     watch: {
@@ -225,8 +265,8 @@ function getSelectedTimeframeIndex() {
 
 <style>
 .tf-selector {
-    top: 50px;
-    left: 60px;
+    top: 5px;
+    left: 500px;
     width: 270px;
     font: 16px -apple-system,BlinkMacSystemFont,
         Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
@@ -235,8 +275,8 @@ function getSelectedTimeframeIndex() {
 }
 .night-mode {
     position: absolute;
-    top: 90px;
-    left: 60px;
+    top: 50px;
+    left: 700px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
@@ -245,8 +285,8 @@ function getSelectedTimeframeIndex() {
 }
 .log-scale {
     position: absolute;
-    top: 90px;
-    left: 160px;
+    top: 65px;
+    left: 700px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
@@ -255,8 +295,8 @@ function getSelectedTimeframeIndex() {
 }
 .gc-mode {
     position: absolute;
-    top: 90px;
-    left: 250px;
+    top: 80px;
+    left: 700px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,

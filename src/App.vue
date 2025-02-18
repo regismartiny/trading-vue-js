@@ -1,7 +1,23 @@
 <template>
-    <span>
+    <span class="container">
+        <symbol-selector :initial-symbol="selected_symbol" v-on:selected="on_selected_symbol"></symbol-selector>
+        <tf-selector :charts="timeFrames" :selectedTimeframeIndex="selected_timeframe_index" v-on:selected="on_selected"></tf-selector>
+        <span class="settings-panel">
+            <span class="night-mode">
+                <input type="checkbox" v-model="night">
+                <label>Night Mode</label>
+            </span>
+            <span class="log-scale">
+                <input type="checkbox" v-model="log_scale">
+                <label>Log Scale</label>
+            </span>
+            <span class="gc-mode">
+                <input type="checkbox" v-model="index_based">
+                <label>Index Based</label>
+            </span>
+         </span>
         <trading-vue :data="chart" :width="this.width" :height="this.height"
-                :titleTxt="symbol"
+                :titleTxt="selected_symbol"
                 :night="night"
                 :toolbar="true"
                 :timezone="-3"
@@ -18,19 +34,6 @@
                 v-on:legend-button-click="on_button_click"
                 ref="tradingVue">
         </trading-vue>
-        <tf-selector :charts="charts" :selectedTimeframeIndex="selected_timeframe_index" v-on:selected="on_selected"></tf-selector>
-        <span class="night-mode">
-            <input type="checkbox" v-model="night">
-            <label>Night Mode</label>
-        </span>
-        <span class="log-scale">
-            <input type="checkbox" v-model="log_scale">
-            <label>Log Scale</label>
-        </span>
-        <span class="gc-mode">
-            <input type="checkbox" v-model="index_based">
-            <label>Index Based</label>
-        </span>
     </span>
 </template>
     
@@ -38,7 +41,8 @@
 import TradingVue from './TradingVue.vue'
 import Const from './stuff/constants.js'
 import Utils from './stuff/utils.js'
-import TfSelector from './components/Timeframes/TFSelector.vue'
+import SymbolSelector from './components/SymbolSelector.vue'
+import TfSelector from './components/TFSelector.vue'
 import Stream from './components/DataHelper/stream.js'
 import DataCube from './helpers/datacube.js'
 import CodeIcon from './components/LegendButtons/code3.json'
@@ -48,7 +52,7 @@ import BB from './components/overlays/BB/BB.vue'
 // Gettin' data through webpack proxy
 const PORT = location.port
 const URL = `http://localhost:${PORT}/api/v1/klines?symbol=`
-const WSS = `ws://localhost:${PORT}/ws/api/btcusdt@aggTrade`
+const WSS = `ws://localhost:${PORT}/ws/api/{symbol}@aggTrade`
 
 const CHUNK_SIZE = 200
 
@@ -108,23 +112,27 @@ export default {
     name: 'App',
     description: 'Main App',
     components: {
-        TradingVue, TfSelector
+        SymbolSelector, TfSelector, TradingVue
     },
     methods: {
         onResize(event) {
             this.width = window.innerWidth
-            this.height = window.innerHeight
+            this.height = window.innerHeight - 40
         },
         on_selected(tf) {
             this.selected_timeframe = tf.name
+            this.reloadData(this.selected_symbol, this.selected_timeframe)
+        },
+        on_selected_symbol(newSymbol) {
+            this.selected_symbol = newSymbol;
             this.reloadData(this.selected_symbol, this.selected_timeframe)
         },
         // New data handler. Should return Promise, or
         // use callback: load_chunk(range, tf, callback)
         async load_chunk(symbol, range, interval) {
             let [t1, t2] = range
-            let q = `${symbol}&interval=${interval}&startTime=${t1}&endTime=${t2}`
-            let r = await fetch(URL + q).then(r => r.json())
+            let url = getAPIURL(symbol, interval, t1, t2)
+            let r = await fetch(url).then(r => r.json())
             return this.format(this.parse_binance(r))
         },
         // Parse a specific exchange format
@@ -148,16 +156,17 @@ export default {
         },
         on_trades(trade) {
             if (!this.chart) return
+            if (trade.s != this.selected_symbol) return
             this.chart.update({
                 t: trade.T,     // Exchange time (optional)
                 price: parseFloat(trade.p),   // Trade price
                 volume: parseFloat(trade.q),  // Trade amount
-                'datasets.binance-btcusdt': [ // Update dataset
-                    trade.T,
-                    trade.m ? 0 : 1,          // Sell or Buy
-                    parseFloat(trade.q),
-                    parseFloat(trade.p)
-                ],
+                // 'datasets.binance-btcusdt': [ // Update dataset
+                //     trade.T,
+                //     trade.m ? 0 : 1,          // Sell or Buy
+                //     parseFloat(trade.q),
+                //     parseFloat(trade.p)
+                // ],
                 // ... other onchart/offchart updates
             })
         },
@@ -178,16 +187,16 @@ export default {
                 //     data: [],
                 //     settings: {}
                 // }],
-                datasets: [{
-                    type: 'Trades',
-                    id: 'binance-btcusdt',
-                    data: []
-                }]
+                // datasets: [{
+                //     type: 'Trades',
+                //     id: 'binance-btcusdt',
+                //     data: []
+                // }]
             }, { aggregation: 100 })
             // Register onrange callback & And a stream of trades
             this.chart.onrange(range => this.load_chunk(symbol, range, binanceTf))
             this.$refs.tradingVue.resetChart()
-            this.stream = new Stream(WSS)
+            this.stream = new Stream(getWebsocketURL())
             this.stream.ontrades = this.on_trades
             window.dc = this.chart      // Debug
             window.tv = this.$refs.tvjs // Debug
@@ -238,11 +247,10 @@ export default {
     },
     data() {
         return {
-            charts: timeFrames,
+            timeFrames: timeFrames,
             chart: {},
-            symbol: getSelectedSymbol(),
             width: window.innerWidth,
-            height: window.innerHeight,
+            height: window.innerHeight - 40,
             log_scale: localStorage.getItem('tradingVue:log_scale') === 'true',
             index_based: localStorage.getItem('tradingVue:index_based') === 'true',
             night: localStorage.getItem('tradingVue:nm') === 'true',
@@ -286,98 +294,58 @@ export default {
 function getSelectedSymbol() {
     return localStorage.getItem('tradingVue:selected_symbol') || 'BTCUSDT'
 }
-
 function getSelectedTimeframeIndex() {
     const selectedTimeframe = localStorage.getItem('tradingVue:selected_timeframe') || '1D'
     return Object.keys(timeFrames).indexOf(selectedTimeframe)
 }
-
 function getOnchartOverlays() {
     const persistedOnchartOverlays = JSON.parse(localStorage.getItem('tradingVue:onchartOverlays'))
     return persistedOnchartOverlays || initialOnchartOverlays
 }
+function getAPIURL(symbol, interval, startTime, endTime) {
+    return URL + `${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}`
+}
+function getWebsocketURL() {
+    return WSS.replace('{symbol}', getSelectedSymbol().toLowerCase())
+}
 </script>
 
 <style>
-.tf-selector {
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    background-color: rgb(14, 19, 31);
+}
+.symbol-selector {
+    position: absolute;
     top: 5px;
-    left: 500px;
+    left: 60px;
+    width: 100px;
+    color: aliceblue;
+}
+.tf-selector {
+    position: absolute;
+    top: 0px;
+    left: 280px;
     width: 270px;
     font: 16px -apple-system,BlinkMacSystemFont,
         Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
         Fira Sans,Droid Sans,Helvetica Neue,
         sans-serif;
 }
-.night-mode {
+.settings-panel {
     position: absolute;
-    top: 50px;
-    left: 700px;
+    top: 5px;
+    right: 0px;
+    width: 250px;
     color: #888;
     font: 11px -apple-system, BlinkMacSystemFont,
         Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
         Fira Sans, Droid Sans, Helvetica Neue,
         sans-serif
-}
-.log-scale {
-    position: absolute;
-    top: 65px;
-    left: 700px;
-    color: #888;
-    font: 11px -apple-system, BlinkMacSystemFont,
-        Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
-        Fira Sans, Droid Sans, Helvetica Neue,
-        sans-serif
-}
-.gc-mode {
-    position: absolute;
-    top: 80px;
-    left: 700px;
-    color: #888;
-    font: 11px -apple-system, BlinkMacSystemFont,
-        Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
-        Fira Sans, Droid Sans, Helvetica Neue,
-        sans-serif
-}
-@media only screen and (max-device-width: 480px) {
-    .tf-selector {
-        top: 50px;
-        left: 70px;
-        max-width: 300px;
-        font: 12px -apple-system,BlinkMacSystemFont,
-            Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,
-            Fira Sans,Droid Sans,Helvetica Neue,
-            sans-serif;
-    }
-    .night-mode {
-        position: absolute;
-        top: 100px;
-        right: 240px;
-        color: #888;
-        font: 11px -apple-system, BlinkMacSystemFont,
-            Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
-            Fira Sans, Droid Sans, Helvetica Neue,
-            sans-serif
-    }
-    .log-scale {
-        position: absolute;
-        top: 100px;
-        right: 160px;
-        color: #888;
-        font: 11px -apple-system, BlinkMacSystemFont,
-            Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
-            Fira Sans, Droid Sans, Helvetica Neue,
-            sans-serif
-    }
-    .gc-mode {
-        position: absolute;
-        top: 100px;
-        right: 70px;
-        color: #888;
-        font: 11px -apple-system, BlinkMacSystemFont,
-            Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
-            Fira Sans, Droid Sans, Helvetica Neue,
-            sans-serif
-    }
 }
 </style>
     

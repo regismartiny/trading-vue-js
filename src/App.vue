@@ -43,7 +43,7 @@ import Stream from './components/DataHelper/stream.js'
 import DataCube from './helpers/datacube.js'
 import CodeIcon from './components/LegendButtons/code3.json'
 import EMAx6 from './components/Scripts/EMAx6.vue'
-import BollingerBands from './components/Scripts/BollingerBands.vue'
+import BB from './components/overlays/BB/BB.vue'
 
 // Gettin' data through webpack proxy
 const PORT = location.port
@@ -140,11 +140,11 @@ export default {
                         name: 'Multiple EMA',
                         data: []
                     },
-                    // {
-                    //     type: 'BollingerBands',
-                    //     name: 'Bollinger Bands',
-                    //     data: []
-                    // }
+                    {
+                        type: 'BB',
+                        name: 'Bollinger Bands',
+                        data: []
+                    }
                 ],
                 // offchart: [{
                 //     type: 'BuySellBalance',
@@ -219,7 +219,7 @@ export default {
             selected_symbol: getSelectedSymbol(),
             selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
             selected_timeframe_index: getSelectedTimeframeIndex(),
-            overlays: [EMAx6, BollingerBands],
+            overlays: [EMAx6, BB],
             buttons: [
                 'display', 'settings', 'remove',
                 // {

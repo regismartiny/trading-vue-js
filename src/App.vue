@@ -328,7 +328,7 @@ function getSelectedTimeframeIndex() {
 }
 function getOnchartOverlays() {
     const persistedOnchartOverlays = JSON.parse(localStorage.getItem('tradingVue:onchartOverlays'))
-    persistedOnchartOverlays.forEach(overlay => overlay.settings.$selected = false)
+    persistedOnchartOverlays?.forEach(overlay => overlay.settings.$selected = false)
     return persistedOnchartOverlays || initialOnchartOverlays
 }
 function getAPIURL(symbol, interval, startTime, endTime) {

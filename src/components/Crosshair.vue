@@ -1,13 +1,13 @@
 <script>
 
 import Crosshair from './js/crosshair.js'
-import Utils from '../stuff/utils.js'
 
 export default {
     name: 'Crosshair',
     props: [ 'cursor', 'colors', 'layout', 'sub' ],
     methods: {
         create() {
+
             this.ch = new Crosshair(this)
 
             // New grid overlay-renderer descriptor.

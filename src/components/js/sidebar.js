@@ -197,6 +197,8 @@ export default class Sidebar {
         }
 
         let lbl = this.$p.cursor.y$.toFixed(this.layout.prec)
+        this.comp.$emit('sidebar-price-change', {price: lbl})
+
         this.ctx.fillStyle = this.$p.colors.panel
 
         let panwidth = this.layout.sb + 1

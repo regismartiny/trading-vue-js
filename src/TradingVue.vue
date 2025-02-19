@@ -26,7 +26,8 @@
             v-bind:config="chart_config"
             v-on:custom-event="custom_event"
             v-on:range-changed="range_changed"
-            v-on:legend-button-click="legend_button">
+            v-on:legend-button-click="legend_button"
+            v-on:createpricealert-button-click="createpricealert_button">
         </chart>
         <transition name="tvjs-drift">
             <the-tip :data="tip" v-if="tip"
@@ -311,12 +312,18 @@ export default {
                 event: 'legend-button-click', args: [event]
             })
         },
+        createpricealert_button(event) {
+            this.custom_event({
+                event: 'createpricealert-button-click', args: [event]
+            })
+        },
         custom_event(d) {
             if ('args' in d) {
                 this.$emit(d.event, ...d.args)
             } else {
                 this.$emit(d.event)
             }
+
             let data = this.$props.data
             let ctrl = this.controllers.length !== 0
             if (ctrl) this.pre_dc(d)

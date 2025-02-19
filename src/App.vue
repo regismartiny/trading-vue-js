@@ -32,6 +32,7 @@
                 :overlays="overlays"
                 :legend-buttons="buttons"
                 v-on:legend-button-click="on_button_click"
+                v-on:createpricealert-button-click="on_createpricealert_button_click"
                 ref="tradingVue">
         </trading-vue>
     </span>
@@ -203,7 +204,6 @@ export default {
             })
         },
         on_button_click(event) {
-            console.log(event)
             if (event.type == 'onchart') {
                 if (event.button === 'display') {
                     let d = this.chart.data[event.type][event.dataIndex]
@@ -221,6 +221,9 @@ export default {
                 }
                 localStorage.setItem('tradingVue:onchartOverlays', JSON.stringify(this.chart.data.onchart))
             }
+        },
+        on_createpricealert_button_click(event) {
+            console.log('createpricealert_button_click', event)
         }
     },
     mounted() {

@@ -54,8 +54,12 @@ export default {
         this.$emit('custom-event', {
             event: 'register-tools', args: tools
         })
-        this.$on('custom-event', e =>
-            this.on_ux_event(e, 'grid'))
+        this.$on('custom-event', e => {
+            this.on_ux_event(e, 'grid')
+            if (e.event == 'grid-mousedown') {
+                this.verifyIfCreatePriceAlertButtonClick(e)
+            }
+        })
     },
     beforeDestroy () {
         if (this.renderer) this.renderer.destroy()
@@ -194,6 +198,11 @@ export default {
             comp.__renderer__ = src.conf.renderer
 
             return comp
+        },
+        verifyIfCreatePriceAlertButtonClick(e) {
+            if (e.args[1].view.innerWidth - e.args[1].x <= 85) {
+                this.$emit('createpricealert-button-click', e)
+            }
         }
     },
     computed: {

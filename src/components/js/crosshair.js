@@ -40,6 +40,15 @@ export default class Crosshair {
         ctx.stroke()
         ctx.restore()
 
+        //Create alert button
+        ctx.fillStyle = this.$p.colors.panel
+        ctx.fillRect(this.layout.width, this.y - 11.5, -20, 22)
+
+        ctx.fillStyle = this.$p.colors.textHL
+        ctx.textAlign = 'left'
+        ctx.fillText('+', this.layout.width - 12.5, this.y + 3.5)
+        ///////////////
+
     }
 
     hide() {

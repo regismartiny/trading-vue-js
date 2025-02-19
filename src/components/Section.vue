@@ -18,14 +18,17 @@
              v-on:layer-meta-props="emit_meta_props"
              v-on:custom-event="emit_custom_event"
              v-on:sidebar-transform="sidebar_transform"
-             v-on:rezoom-range="rezoom_range">
+             v-on:rezoom-range="rezoom_range"
+             v-on:createpricealert-button-click="createpricealert_button_click"
+            >
         </grid>
         <sidebar
             :ref="'sb-' + grid_id"
             v-bind="sidebar_props"
             v-bind:grid_id="grid_id"
             v-bind:rerender="rerender"
-            v-on:sidebar-transform="sidebar_transform">
+            v-on:sidebar-transform="sidebar_transform"
+            v-on:sidebar-price-change="sidebar_price_change">
         </sidebar>
     </div>
 </template>
@@ -60,8 +63,18 @@ export default {
         cursor_locked(state) {
             this.$emit('cursor-locked', state)
         },
+        createpricealert_button_click(c) {
+            const data = {
+                timestamp: c.args[1].timeStamp,
+                price: this.sidebar_current_price
+            }
+            this.$emit('createpricealert-button-click', data)
+        },
         sidebar_transform(s) {
             this.$emit('sidebar-transform', s)
+        },
+        sidebar_price_change(d) {
+            this.sidebar_current_price = d.price
         },
         emit_meta_props(d) {
             this.$set(this.meta_props, d.layer_id, d)
@@ -176,7 +189,8 @@ export default {
         return {
             meta_props: {},
             rerender: 0,
-            last_ghash: ''
+            last_ghash: '',
+            sidebar_current_price: 0
         }
     }
 }

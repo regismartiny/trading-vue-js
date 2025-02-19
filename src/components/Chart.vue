@@ -15,6 +15,7 @@
             v-on:layer-meta-props="layer_meta_props"
             v-on:custom-event="emit_custom_event"
             v-on:legend-button-click="legend_button_click"
+            v-on:createpricealert-button-click="createpricealert_button_click"
             >
         </grid-section>
         <botbar v-bind="botbar_props"
@@ -234,6 +235,9 @@ export default {
         },
         legend_button_click(event) {
             this.$emit('legend-button-click', event)
+        },
+        createpricealert_button_click(event) {
+            this.$emit('createpricealert-button-click', event)
         },
         register_kb(event) {
             if (!this.$refs.keyboard) return

@@ -324,6 +324,22 @@ export default {
                 this.$emit(d.event)
             }
 
+            if (['object-selected', 'object-deselected', 'change-settings-done', 'remove-tool'].includes(d.event)) {
+                const toolId = d.args[2]
+                if (toolId) {
+                    const onchartId = toolId.split("-")[0]
+                    const onchart = this.$props.data.data.onchart
+                    const index = onchart.findIndex((x) => x.id == onchartId)
+                    
+                    const data = {
+                        event: d.event,
+                        args: d.args,
+                        onChartIndex: index
+                    }
+                    this.$emit('tool-changed', data)
+                }
+            }
+
             let data = this.$props.data
             let ctrl = this.controllers.length !== 0
             if (ctrl) this.pre_dc(d)

@@ -85,7 +85,9 @@ export default {
         custom_event(event, ...args) {
             if (event.split(':')[0] === 'hook') return
             if (event === 'change-settings' ||
+                event === 'change-settings-done' ||
                 event === 'object-selected' ||
+                event === 'object-deselected' ||
                 event === 'new-shader' ||
                 event === 'new-interface' ||
                 event === 'remove-tool') {

@@ -32,6 +32,10 @@ export default {
                     this.start_drag()
                     e.preventDefault()
                     this.pins.forEach(x => x.mousedown(e, true))
+                } else {
+                    if (this.selected) {
+                        this.$emit('object-deselected')
+                    }
                 }
             })
             this.mouse.on('mouseup', e => {
@@ -53,7 +57,7 @@ export default {
         },
         set_state(name) {
             this.$emit('change-settings', {
-                 $state: name
+                $state: name
             })
         },
         watch_uuid(n, p) {

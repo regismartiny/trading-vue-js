@@ -35,6 +35,7 @@
                 :legend-buttons="buttons"
                 v-on:legend-button-click="on_button_click"
                 v-on:createpricealert-button-click="on_createpricealert_button_click"
+                v-on:tool-changed="on_tool_changed"
                 ref="tradingVue">
         </trading-vue>
     </span>
@@ -226,6 +227,14 @@ export default {
         },
         on_createpricealert_button_click(event) {
             console.log('createpricealert_button_click', event)
+        },
+        on_tool_changed(event) {
+            console.log('tool-changed', event)
+            const onChart = this.chart.data.onchart
+            const onChartItem = onChart[event.onChartIndex]
+            if (onChartItem.settings.$state == 'finished') {
+                localStorage.setItem('tradingVue:onchartOverlays', JSON.stringify(onChart))
+            }
         }
     },
     mounted() {
@@ -319,6 +328,7 @@ function getSelectedTimeframeIndex() {
 }
 function getOnchartOverlays() {
     const persistedOnchartOverlays = JSON.parse(localStorage.getItem('tradingVue:onchartOverlays'))
+    persistedOnchartOverlays.forEach(overlay => overlay.settings.$selected = false)
     return persistedOnchartOverlays || initialOnchartOverlays
 }
 function getAPIURL(symbol, interval, startTime, endTime) {

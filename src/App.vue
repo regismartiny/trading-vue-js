@@ -15,17 +15,19 @@
                 <input type="checkbox" v-model="index_based">
                 <label>Index Based</label>
             </span>
+            <span class="grid-mode">
+                <input type="checkbox" v-model="show_grid">
+                <label>Show Grid</label>
+            </span>
          </span>
         <trading-vue :data="chart" :width="this.width" :height="this.height"
                 :titleTxt="selected_symbol"
-                :night="night"
                 :toolbar="true"
                 :timezone="-3"
                 :index-based="index_based"
                 :log_scale="log_scale"
                 :selected_timeframe="selected_timeframe"
                 :selected_symbol="selected_symbol"
-                :colors="colors"
                 :color-back="colors.colorBack"
                 :color-grid="colors.colorGrid"
                 :color-text="colors.colorText"
@@ -237,12 +239,21 @@ export default {
     },
     computed: {
         colors() {
-            return this.night ? {} : {
+            return this.night ? {
+                colorBack: '#000',
+                colorGrid: this.grid_color,
+            } : 
+            {
                 colorBack: '#fff',
-                colorGrid: '#eee',
+                colorGrid: this.grid_color,
                 colorText: '#333'
             }
         },
+        grid_color() {
+            return this.show_grid 
+            ? (this.night ? '#2f3240' : '#ccc')
+            : (this.night ? '#000' : '#eee')
+        }
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.onResize)
@@ -257,6 +268,7 @@ export default {
             log_scale: localStorage.getItem('tradingVue:log_scale') === 'true',
             index_based: localStorage.getItem('tradingVue:index_based') === 'true',
             night: localStorage.getItem('tradingVue:nm') === 'true',
+            show_grid: localStorage.getItem('tradingVue:show_grid') === 'true',
             selected_symbol: getSelectedSymbol(),
             selected_timeframe: localStorage.getItem('tradingVue:selected_timeframe'),
             selected_timeframe_index: getSelectedTimeframeIndex(),
@@ -284,6 +296,10 @@ export default {
         },
         index_based(v) {
             localStorage.setItem('tradingVue:index_based', v)
+        },
+        show_grid(v) {
+            localStorage.setItem('tradingVue:show_grid', v)
+            this.colors.colorGrid = this.grid_color
         },
         selected_timeframe(v) {
             localStorage.setItem('tradingVue:selected_timeframe', v)
@@ -341,7 +357,7 @@ function getWebsocketURL() {
 }
 .settings-panel {
     position: absolute;
-    top: 5px;
+    top: 2px;
     right: 0px;
     width: 250px;
     color: #888;
